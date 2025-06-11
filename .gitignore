@@ -1,0 +1,95 @@
+# .NET Core / ASP.NET Core
+bin/
+obj/
+*.user
+*.userosscache
+*.suo
+*.dll
+*.pdb
+*.dll.config
+*.exe
+*.json.user
+*.cache
+*.log
+project.lock.json
+artifacts/
+
+# Visual Studio / Visual Studio Code
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.ionide/
+
+# Docker
+.dockerignore
+**/.docker/secrets/
+.env
+
+# Database
+*.mdf
+*.ldf
+*.ndf
+*.jfm
+
+# User-specific files
+*.rsuser
+*.userprefs
+*.usertasks
+.idea/
+*.sln.iml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Development environment specific files
+appsettings.Development.json
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# MSBuild Binary and Structured Log
+*.binlog
+
+# Temporary files
+*.tmp
+temp/
+
+# NuGet
+.nuget/
+packages/
+*.nupkg
+*.snupkg
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
