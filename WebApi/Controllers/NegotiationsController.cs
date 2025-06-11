@@ -46,11 +46,21 @@ namespace Negotiations.Controllers
                 return NotFound();
             }
 
-            if (User.Identity?.IsAuthenticated != true && 
-                !string.IsNullOrEmpty(negotiation.ClientIdentifier) &&
-                negotiation.ClientIdentifier != Request.Headers["Client-Identifier"].ToString())
+            // If user is not authenticated, they must be the client
+            if (User.Identity?.IsAuthenticated != true)
             {
-                return Forbid();
+                string clientIdentifier = Request.Headers["Client-Identifier"].ToString();
+                string? clientEmail = Request.Query["email"].ToString();
+                
+                bool isClientIdentifierMatch = !string.IsNullOrEmpty(negotiation.ClientIdentifier) && 
+                                              negotiation.ClientIdentifier == clientIdentifier;
+                bool isClientEmailMatch = !string.IsNullOrEmpty(clientEmail) && 
+                                         clientEmail == negotiation.ClientEmail;
+                
+                if (!isClientIdentifierMatch && !isClientEmailMatch)
+                {
+                    return Forbid();
+                }
             }
 
             return negotiation;
@@ -60,16 +70,29 @@ namespace Negotiations.Controllers
         public async Task<ActionResult<IEnumerable<Negotiation>>> GetClientNegotiations()
         {
             string clientIdentifier = Request.Headers["Client-Identifier"].ToString();
-            if (string.IsNullOrEmpty(clientIdentifier))
+            string? clientEmail = Request.Query["email"].ToString();
+            
+            if (string.IsNullOrEmpty(clientIdentifier) && string.IsNullOrEmpty(clientEmail))
             {
-                return BadRequest("Client identifier is required");
+                return BadRequest("Either client identifier or email is required");
             }
 
-            return await _context.Negotiations
+            var query = _context.Negotiations
                 .Include(n => n.Product)
                 .Include(n => n.RespondedByUser)
-                .Where(n => n.ClientIdentifier == clientIdentifier)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(clientIdentifier))
+            {
+                query = query.Where(n => n.ClientIdentifier == clientIdentifier);
+            }
+            
+            if (!string.IsNullOrEmpty(clientEmail))
+            {
+                query = query.Where(n => n.ClientEmail == clientEmail);
+            }
+
+            return await query.ToListAsync();
         }
 
         [HttpPost]
@@ -92,16 +115,24 @@ namespace Negotiations.Controllers
             }
 
             string clientIdentifier = Request.Headers["Client-Identifier"].ToString();
-            if (string.IsNullOrEmpty(clientIdentifier))
+            
+            string clientEmail = request.ClientEmail;
+
+            var existingNegotiationQuery = _context.Negotiations
+                .Where(n => n.ProductId == request.ProductId &&
+                           n.Status == NegotiationStatus.Pending);
+                
+            if (!string.IsNullOrEmpty(clientIdentifier))
             {
-                return BadRequest("Client identifier is required");
+                existingNegotiationQuery = existingNegotiationQuery.Where(n => 
+                    n.ClientIdentifier == clientIdentifier || n.ClientEmail == clientEmail);
+            }
+            else
+            {
+                existingNegotiationQuery = existingNegotiationQuery.Where(n => n.ClientEmail == clientEmail);
             }
 
-            var existingNegotiation = await _context.Negotiations
-                .Where(n => n.ProductId == request.ProductId && 
-                           n.ClientIdentifier == clientIdentifier && 
-                           n.Status == NegotiationStatus.Pending)
-                .FirstOrDefaultAsync();
+            var existingNegotiation = await existingNegotiationQuery.FirstOrDefaultAsync();
 
             if (existingNegotiation != null)
             {
@@ -113,6 +144,8 @@ namespace Negotiations.Controllers
                 ProductId = request.ProductId,
                 ProposedPrice = request.ProposedPrice,
                 ClientIdentifier = clientIdentifier,
+                ClientEmail = request.ClientEmail,  
+                ClientName = request.ClientName,
                 Status = NegotiationStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
                 AttemptCount = 1
@@ -184,9 +217,17 @@ namespace Negotiations.Controllers
             }
 
             string clientIdentifier = Request.Headers["Client-Identifier"].ToString();
-            if (string.IsNullOrEmpty(clientIdentifier) || negotiation.ClientIdentifier != clientIdentifier)
+            string? clientEmail = Request.Query["email"].ToString();
+                
+            bool isClientIdentifierMatch = !string.IsNullOrEmpty(clientIdentifier) && 
+                                          !string.IsNullOrEmpty(negotiation.ClientIdentifier) && 
+                                          negotiation.ClientIdentifier == clientIdentifier;
+            bool isClientEmailMatch = !string.IsNullOrEmpty(clientEmail) && 
+                                     clientEmail == negotiation.ClientEmail;
+                
+            if (!isClientIdentifierMatch && !isClientEmailMatch)
             {
-                return Forbid();
+                return Forbid("You are not authorized to access this negotiation");
             }
 
             if (negotiation.Status != NegotiationStatus.Rejected)
@@ -244,6 +285,12 @@ namespace Negotiations.Controllers
         
         [Range(0.01, double.MaxValue, ErrorMessage = "Proposed price must be greater than 0")]
         public decimal ProposedPrice { get; set; }
+        
+        [Required]
+        [EmailAddress]
+        public string ClientEmail { get; set; } = string.Empty;
+        
+        public string? ClientName { get; set; }
     }
 
     public class NegotiationResponse

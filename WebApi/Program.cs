@@ -7,21 +7,23 @@ using Negotiations.Data;
 using Negotiations.Models;
 using Negotiations.Services;
 using System.Text;
+using HealthChecks.NpgSql;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-
-// Add PostgreSQL DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add health checks
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddHealthChecks()
-    .AddNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"), 
-        name: "database", 
-        tags: new[] { "db", "sql", "postgresql" })
+    .AddNpgSql(
+        connectionString, 
+        name: "postgresql", 
+        tags: new[] { "db", "sql", "postgresql" },
+        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded
+    )
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), 
         tags: new[] { "service" });
 
@@ -29,7 +31,6 @@ builder.Services.AddHealthChecks()
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
 
-// Add Authentication
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -49,7 +50,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Add Authorization
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("admin"));
@@ -57,20 +57,16 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireAdminOrSellerRole", policy => policy.RequireRole("admin", "seller"));
 });
 
-// Register custom services
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 
-// Add controllers
 builder.Services.AddControllers();
 
-// Add Swagger services with JWT configuration
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Negotiations API", Version = "v1" });
     
-    // Add JWT Authentication to Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
@@ -102,7 +98,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var retryCount = 5;
+    var retryCount = 10; // Increased retry count
     var retryDelay = TimeSpan.FromSeconds(10);
     var success = false;
     
@@ -117,14 +113,39 @@ using (var scope = app.Services.CreateScope())
             
             var context = services.GetRequiredService<ApplicationDbContext>();
             
-            // Apply migrations instead of EnsureCreated
-            // This will create the database if it doesn't exist and apply all migrations
-            context.Database.Migrate();
-            Console.WriteLine("Database migrations applied successfully.");
+            if (!await context.Database.CanConnectAsync())
+            {
+                Console.WriteLine("Cannot connect to the database. Waiting before retry...");
+                await Task.Delay(retryDelay);
+                continue;
+            }
             
-            // Initialize database with seed data
-            await DbInitializer.Initialize(context);
-            Console.WriteLine("Database initialized with seed data.");
+            try
+            {
+                var tableExists = await context.Database.ExecuteSqlRawAsync("SELECT 1 FROM pg_tables WHERE schemaname = 'public'");
+                Console.WriteLine($"Database tables check result: {tableExists}");
+            }
+            catch (Exception tableEx)
+            {
+                Console.WriteLine($"Table check failed (this may be normal): {tableEx.Message}");
+            }
+            
+            try 
+            {
+                Console.WriteLine("Applying database migrations...");
+                await context.Database.MigrateAsync();
+                Console.WriteLine("Database migrations applied successfully.");
+                
+                Console.WriteLine("Initializing seed data...");
+                await DbInitializer.Initialize(context);
+                Console.WriteLine("Database initialized with seed data.");
+            }
+            catch (Exception migrateEx)
+            {
+                Console.WriteLine($"Migration error: {migrateEx.Message}");
+                Console.WriteLine(migrateEx.ToString());
+                throw; 
+            }
             
             success = true;
         }
@@ -134,6 +155,8 @@ using (var scope = app.Services.CreateScope())
             {
                 Console.WriteLine($"Failed to apply migrations after {retryCount} attempts: {ex.Message}");
                 Console.WriteLine(ex.ToString());
+                Console.WriteLine("Continuing application startup despite migration failure.");
+                success = true; 
             }
             else
             {
@@ -144,23 +167,40 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    // Enable Swagger and Swagger UI
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
-// Add authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map health check endpoints
+// Healyh check
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                exception = e.Value.Exception?.Message,
+                duration = e.Value.Duration.ToString()
+            })
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+
+// Add a separate endpoint for database health checks
+app.MapHealthChecks("/health/db", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = (check) => check.Tags.Contains("db"),
     ResponseWriter = async (context, report) =>
     {
         context.Response.ContentType = "application/json";

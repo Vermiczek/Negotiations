@@ -22,7 +22,13 @@ namespace Negotiations.Models
         [Range(0.01, double.MaxValue, ErrorMessage = "Proposed price must be greater than 0")]
         public decimal ProposedPrice { get; set; }
         
-        public string? ClientIdentifier { get; set; } 
+        public string? ClientIdentifier { get; set; }
+        
+        [Required]
+        [EmailAddress]
+        public string ClientEmail { get; set; } = string.Empty;
+        
+        public string? ClientName { get; set; }
         
         public int? RespondedByUserId { get; set; }
         public User? RespondedByUser { get; set; } 

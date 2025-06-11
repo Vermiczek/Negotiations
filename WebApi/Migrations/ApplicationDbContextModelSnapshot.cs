@@ -33,7 +33,14 @@ namespace Negotiations.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ClientEmail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("ClientIdentifier")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClientName")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")

@@ -11,13 +11,35 @@ namespace Negotiations.Data
     {
         public static async Task Initialize(ApplicationDbContext context)
         {
+            // Ensure roles exist first
             await InitializeRolesAsync(context);
+            
+            // Then create users
             await CreateDefaultAdminIfNotExistsAsync(context);
+            await CreateDefaultSellerIfNotExistsAsync(context);
         }
         
         private static async Task InitializeRolesAsync(ApplicationDbContext context)
         {
-            await CreateDefaultSellerIfNotExistsAsync(context);
+            try
+            {
+                var roleCount = await context.Roles.CountAsync();
+                Console.WriteLine($"Found {roleCount} roles in the database.");
+                
+                if (roleCount == 0)
+                {
+                    Console.WriteLine("No roles found in database. Check if migrations ran properly.");
+                }
+                else
+                {
+                    Console.WriteLine("Roles already exist. Skipping role creation.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking roles: {ex.Message}");
+                throw;
+            }
         }
         
         private static async Task CreateDefaultAdminIfNotExistsAsync(ApplicationDbContext context)
@@ -40,7 +62,8 @@ namespace Negotiations.Data
                     PasswordHash = passwordHash,
                     FirstName = "Admin",
                     LastName = "User",
-                    IsActive = true
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
                 };
                 
                 context.Users.Add(adminUser);
@@ -77,7 +100,8 @@ namespace Negotiations.Data
                     PasswordHash = passwordHash,
                     FirstName = "Store",
                     LastName = "Employee",
-                    IsActive = true
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
                 };
                 
                 context.Users.Add(sellerUser);

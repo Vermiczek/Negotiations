@@ -28,7 +28,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     chmod +x ./docker-entrypoint.sh
 ENV PATH="${PATH}:/root/.dotnet/tools"
-# Set environment variables for better defaults
 ENV DOTNET_EnableDiagnostics=0
-ENV ASPNETCORE_URLS="http://+:8080;https://+:443"
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENV ASPNETCORE_URLS="http://+:8080"
+# Use shell form of ENTRYPOINT to ensure proper script execution
+ENTRYPOINT ["/bin/bash", "./docker-entrypoint.sh"]

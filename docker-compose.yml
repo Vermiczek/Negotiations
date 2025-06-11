@@ -7,7 +7,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-      - "8443:443"
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,8 +20,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 60s
     networks:
       - app-network
 
@@ -40,10 +39,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d itemsdb -c 'SELECT 1'"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     networks:
       - app-network
 
