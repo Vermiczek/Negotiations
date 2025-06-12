@@ -20,12 +20,27 @@ namespace Negotiations.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// Get all available products
+        /// </summary>
+        /// <remarks>
+        /// Retrieves a list of all products in the system. Publicly accessible.
+        /// </remarks>
+        /// <returns>A list of all products</returns>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
             return await _context.Products.ToListAsync();
         }
 
+        /// <summary>
+        /// Get a specific product by ID
+        /// </summary>
+        /// <remarks>
+        /// Retrieves detailed information for a specific product.
+        /// </remarks>
+        /// <param name="id">The ID of the product to retrieve</param>
+        /// <returns>The product details</returns>
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
@@ -39,6 +54,14 @@ namespace Negotiations.Controllers
             return product;
         }
 
+        /// <summary>
+        /// Create a new product
+        /// </summary>
+        /// <remarks>
+        /// Allows admins and sellers to create a new product in the system.
+        /// </remarks>
+        /// <param name="product">The product details to create</param>
+        /// <returns>The created product with assigned ID</returns>
         [HttpPost]
         [Authorize(Policy = "RequireAdminOrSellerRole")]
         public async Task<ActionResult<Product>> CreateProduct(Product product)
@@ -55,6 +78,16 @@ namespace Negotiations.Controllers
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
 
+        /// <summary>
+        /// Update an existing product
+        /// </summary>
+        /// <remarks>
+        /// Allows admins and sellers to update product details (name, description, and price).
+        /// The creation date is preserved.
+        /// </remarks>
+        /// <param name="id">ID of the product to update</param>
+        /// <param name="product">Updated product details</param>
+        /// <returns>No content on success</returns>
         [HttpPut("{id}")]
         [Authorize(Policy = "RequireAdminOrSellerRole")]
         public async Task<IActionResult> UpdateProduct(int id, Product product)
@@ -93,6 +126,14 @@ namespace Negotiations.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Delete a product
+        /// </summary>
+        /// <remarks>
+        /// Allows admins to delete a product. Only products without active negotiations can be deleted.
+        /// </remarks>
+        /// <param name="id">ID of the product to delete</param>
+        /// <returns>No content on success</returns>
         [HttpDelete("{id}")]
         [Authorize(Policy = "RequireAdminRole")]
         public async Task<IActionResult> DeleteProduct(int id)

@@ -22,6 +22,14 @@ namespace Negotiations.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// Get system dashboard statistics
+        /// </summary>
+        /// <remarks>
+        /// Provides overview statistics about users, roles, and system information.
+        /// Only accessible to administrators.
+        /// </remarks>
+        /// <returns>Dashboard statistics including user counts, role distribution, and system info</returns>
         [HttpGet("dashboard")]
         public async Task<IActionResult> GetDashboard()
         {
@@ -53,6 +61,14 @@ namespace Negotiations.Controllers
             });
         }
 
+        /// <summary>
+        /// Get all users with their assigned roles
+        /// </summary>
+        /// <remarks>
+        /// Retrieves a complete list of users in the system along with their role assignments.
+        /// Only accessible to administrators.
+        /// </remarks>
+        /// <returns>List of users with their profile information and roles</returns>
         [HttpGet("users")]
         public async Task<ActionResult<IEnumerable<object>>> GetAllUsersWithRoles()
         {
@@ -75,6 +91,15 @@ namespace Negotiations.Controllers
             return Ok(users);
         }
 
+        /// <summary>
+        /// Toggle a user's active status
+        /// </summary>
+        /// <remarks>
+        /// Allows administrators to activate or deactivate user accounts.
+        /// If the user is currently active, they will be set to inactive and vice versa.
+        /// </remarks>
+        /// <param name="id">The ID of the user whose status will be toggled</param>
+        /// <returns>Confirmation message with the user's new status</returns>
         [HttpPut("users/{id}/toggle-status")]
         public async Task<IActionResult> ToggleUserStatus(int id)
         {
@@ -90,6 +115,15 @@ namespace Negotiations.Controllers
             return Ok(new { message = $"User {user.Username} is now {(user.IsActive ? "active" : "inactive")}" });
         }
 
+        /// <summary>
+        /// Create a new role
+        /// </summary>
+        /// <remarks>
+        /// Allows administrators to create new roles in the system.
+        /// Role names must be unique (case-insensitive).
+        /// </remarks>
+        /// <param name="request">Request containing the name for the new role</param>
+        /// <returns>The created role with its assigned ID</returns>
         [HttpPost("roles")]
         public async Task<ActionResult<Role>> CreateRole([FromBody] CreateRoleRequest request)
         {
@@ -105,6 +139,14 @@ namespace Negotiations.Controllers
             return CreatedAtAction(nameof(GetRole), new { id = role.Id }, role);
         }
 
+        /// <summary>
+        /// Get a specific role by ID
+        /// </summary>
+        /// <remarks>
+        /// Retrieves detailed information for a specific role.
+        /// </remarks>
+        /// <param name="id">The ID of the role to retrieve</param>
+        /// <returns>The role details</returns>
         [HttpGet("roles/{id}")]
         public async Task<ActionResult<Role>> GetRole(int id)
         {
@@ -118,8 +160,14 @@ namespace Negotiations.Controllers
         }
     }
 
+    /// <summary>
+    /// Request model for creating a new role
+    /// </summary>
     public class CreateRoleRequest
     {
+        /// <summary>
+        /// Name of the role to create
+        /// </summary>
         public string Name { get; set; } = string.Empty;
     }
 }

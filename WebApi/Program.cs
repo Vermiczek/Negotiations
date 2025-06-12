@@ -101,7 +101,16 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Negotiations API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { 
+        Title = "Negotiations API", 
+        Version = "v1",
+        Description = "API for price negotiations between customers and sellers",
+        Contact = new OpenApiContact
+        {
+            Name = "API Support",
+            Email = "support@negotiations-example.com"
+        }
+    });
     
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -126,6 +135,10 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+    
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
 });
 
 var app = builder.Build();
@@ -134,7 +147,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var retryCount = 10; // Increased retry count
+    var retryCount = 10; 
     var retryDelay = TimeSpan.FromSeconds(10);
     var success = false;
     

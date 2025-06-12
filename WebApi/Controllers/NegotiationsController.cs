@@ -23,6 +23,13 @@ namespace Negotiations.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// Get all negotiations in the system
+        /// </summary>
+        /// <remarks>
+        /// Requires admin or seller role. Returns full list of all negotiations with product and responder details.
+        /// </remarks>
+        /// <returns>A list of all negotiations</returns>
         [HttpGet]
         [Authorize(Policy = "RequireAdminOrSellerRole")]
         public async Task<ActionResult<IEnumerable<Negotiation>>> GetNegotiations()
@@ -33,6 +40,14 @@ namespace Negotiations.Controllers
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Get a specific negotiation by ID
+        /// </summary>
+        /// <remarks>
+        /// Authenticated users can access any negotiation. Unauthenticated users must provide client identifier or email to access their own negotiations.
+        /// </remarks>
+        /// <param name="id">The ID of the negotiation to retrieve</param>
+        /// <returns>The negotiation details</returns>
         [HttpGet("{id}")]
         public async Task<ActionResult<Negotiation>> GetNegotiation(int id)
         {
@@ -66,6 +81,14 @@ namespace Negotiations.Controllers
             return negotiation;
         }
         
+        /// <summary>
+        /// Get all negotiations for a specific client
+        /// </summary>
+        /// <remarks>
+        /// Retrieves negotiations based on client identifier in header or email in query parameter.
+        /// Either client identifier or email must be provided.
+        /// </remarks>
+        /// <returns>List of negotiations for the specified client</returns>
         [HttpGet("client")]
         public async Task<ActionResult<IEnumerable<Negotiation>>> GetClientNegotiations()
         {
@@ -95,6 +118,15 @@ namespace Negotiations.Controllers
             return await query.ToListAsync();
         }
 
+        /// <summary>
+        /// Create a new price negotiation request
+        /// </summary>
+        /// <remarks>
+        /// Creates a new negotiation for a product. Client identifier is taken from the request header.
+        /// Client can only have one active negotiation per product.
+        /// </remarks>
+        /// <param name="request">The negotiation request details</param>
+        /// <returns>The created negotiation</returns>
         [HttpPost]
         public async Task<ActionResult<Negotiation>> CreateNegotiation(NegotiationCreateRequest request)
         {
@@ -157,6 +189,16 @@ namespace Negotiations.Controllers
             return CreatedAtAction(nameof(GetNegotiation), new { id = negotiation.Id }, negotiation);
         }
 
+        /// <summary>
+        /// Respond to a negotiation request
+        /// </summary>
+        /// <remarks>
+        /// Allows admins and sellers to accept or reject a negotiation. 
+        /// If rejected, the client has 7 days to propose a new price.
+        /// </remarks>
+        /// <param name="id">The negotiation ID</param>
+        /// <param name="response">The response with accept/reject decision and optional comment</param>
+        /// <returns>Status information about the negotiation response</returns>
         [HttpPost("{id}/respond")]
         [Authorize(Policy = "RequireAdminOrSellerRole")]
         public async Task<IActionResult> RespondToNegotiation(int id, NegotiationResponse response)
@@ -202,6 +244,17 @@ namespace Negotiations.Controllers
             });
         }
 
+        /// <summary>
+        /// Propose a new price for a rejected negotiation
+        /// </summary>
+        /// <remarks>
+        /// Allows client to propose a new price after their negotiation was rejected.
+        /// Limited to 3 attempts and must be done within the deadline (7 days from rejection).
+        /// Requires client identifier or email to match the negotiation.
+        /// </remarks>
+        /// <param name="id">The negotiation ID</param>
+        /// <param name="request">The new price proposal</param>
+        /// <returns>Status information about the new proposal</returns>
         [HttpPost("{id}/propose-new-price")]
         public async Task<IActionResult> ProposeNewPrice(int id, NewPriceRequest request)
         {
@@ -267,6 +320,14 @@ namespace Negotiations.Controllers
             return Ok(new { message = "New price proposed successfully", attemptCount = negotiation.AttemptCount });
         }
 
+        /// <summary>
+        /// Get all negotiations for a specific product
+        /// </summary>
+        /// <remarks>
+        /// Available only to admins and sellers. Returns all negotiations for a given product ID.
+        /// </remarks>
+        /// <param name="productId">The ID of the product</param>
+        /// <returns>List of negotiations for the product</returns>
         [HttpGet("product/{productId}")]
         [Authorize(Policy = "RequireAdminOrSellerRole")]
         public async Task<ActionResult<IEnumerable<Negotiation>>> GetNegotiationsForProduct(int productId)
@@ -279,28 +340,59 @@ namespace Negotiations.Controllers
         }
     }
 
+    /// <summary>
+    /// Request model for creating a new negotiation
+    /// </summary>
     public class NegotiationCreateRequest
     {
+        /// <summary>
+        /// ID of the product to negotiate on
+        /// </summary>
         public int ProductId { get; set; }
         
+        /// <summary>
+        /// Client's proposed price for the product
+        /// </summary>
         [Range(0.01, double.MaxValue, ErrorMessage = "Proposed price must be greater than 0")]
         public decimal ProposedPrice { get; set; }
         
+        /// <summary>
+        /// Client's email for notifications and identification
+        /// </summary>
         [Required]
         [EmailAddress]
         public string ClientEmail { get; set; } = string.Empty;
         
+        /// <summary>
+        /// Optional client's name
+        /// </summary>
         public string? ClientName { get; set; }
     }
 
+    /// <summary>
+    /// Response model for responding to a negotiation
+    /// </summary>
     public class NegotiationResponse
     {
+        /// <summary>
+        /// Whether the seller accepts the proposed price
+        /// </summary>
         public bool IsAccepted { get; set; }
+        
+        /// <summary>
+        /// Optional comment from the seller
+        /// </summary>
         public string? Comment { get; set; }
     }
 
+    /// <summary>
+    /// Request model for proposing a new price after rejection
+    /// </summary>
     public class NewPriceRequest
     {
+        /// <summary>
+        /// Client's new proposed price
+        /// </summary>
         [Range(0.01, double.MaxValue, ErrorMessage = "Proposed price must be greater than 0")]
         public decimal ProposedPrice { get; set; }
     }
