@@ -9,13 +9,31 @@ using Negotiations.Services;
 using System.Text;
 using HealthChecks.NpgSql;
 using Npgsql;
+using DotNetEnv;
+
+// Load environment variables from .env file
+Env.Load();
+Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Create connection string from environment variables if they exist
+string connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// Override with environment variables if they exist (for .env file support)
+string dbHost = Environment.GetEnvironmentVariable("DB_HOST");
+string dbName = Environment.GetEnvironmentVariable("DB_NAME");
+string dbUser = Environment.GetEnvironmentVariable("DB_USER");
+string dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
+
+if (!string.IsNullOrEmpty(dbHost) && !string.IsNullOrEmpty(dbName) && 
+    !string.IsNullOrEmpty(dbUser) && !string.IsNullOrEmpty(dbPassword))
+{
+    connectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPassword}";
+}
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddHealthChecks()
     .AddNpgSql(
@@ -31,6 +49,24 @@ builder.Services.AddHealthChecks()
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
 
+// Override JWT settings from environment variables if they exist
+string jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? jwtSettings?.Secret ?? "fallbackKeyForDevOnly";
+string jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? jwtSettings?.Issuer ?? "NegotiationsApi";
+string jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? jwtSettings?.Audience ?? "NegotiationsClient";
+
+// Register the JWT settings service with values that may be from .env
+builder.Services.Configure<JwtSettings>(options =>
+{
+    options.Secret = jwtSecret;
+    options.Issuer = jwtIssuer;
+    options.Audience = jwtAudience;
+    
+    if (int.TryParse(Environment.GetEnvironmentVariable("JWT_EXPIRY_MINUTES"), out int expiryMinutes))
+        options.ExpiryMinutes = expiryMinutes;
+    else
+        options.ExpiryMinutes = jwtSettings?.ExpiryMinutes ?? 120;
+});
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -44,9 +80,9 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings?.Issuer,
-        ValidAudience = jwtSettings?.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings?.Secret ?? "fallbackKeyForDevOnly"))
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
     };
 });
 

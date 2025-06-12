@@ -32,6 +32,7 @@
 **/[Tt]est[Rr]esult*/
 **/[Bb]uild[Ll]og.*
 **/TestResults/
+**/IntegrationTests/
 
 # OS generated files
 **/.DS_Store

@@ -1,10 +1,22 @@
 #!/bin/bash
 set -e
 
-# for your own sanity dont look in there - layers of fixes and workarounds, some 
+# Load environment variables from .env file if it exists
+if [ -f /app/.env ]; then
+    echo "Loading environment variables from .env file..."
+    export $(grep -v '^#' /app/.env | xargs)
+fi
+
+# Set default PostgreSQL connection parameters if not provided in environment
+: ${DB_HOST:="postgres"}
+: ${DB_USER:="postgres"}
+: ${DB_PASSWORD:="postgres"}
+: ${DB_NAME:="itemsdb"}
+
 echo "Waiting for PostgreSQL to be ready..."
+echo "Trying to connect to PostgreSQL at $DB_HOST as user $DB_USER"
 for i in {1..90}; do
-  if PGPASSWORD=$POSTGRES_PASSWORD psql -h "postgres" -U "$POSTGRES_USER" -d "postgres" -c '\q' 2>/dev/null; then
+  if PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d "postgres" -c '\q' 2>/dev/null; then
     echo "PostgreSQL up"
     break
   fi
@@ -19,12 +31,12 @@ cd /app
 
 echo "Creating database if it doesn't exist..."
 for i in {1..10}; do
-  if PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$POSTGRES_DB'" 2>/dev/null | grep -q 1; then
-    echo "Database $POSTGRES_DB exists"
+  if PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" 2>/dev/null | grep -q 1; then
+    echo "Database $DB_NAME exists"
     break
   else
-    echo "Creating database $POSTGRES_DB (attempt $i/10)"
-    PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB" 2>/dev/null || true
+    echo "Creating database $DB_NAME (attempt $i/10)"
+    PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME" 2>/dev/null || true
     sleep 2
   fi
   

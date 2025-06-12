@@ -21,6 +21,7 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 COPY --from=build /root/.dotnet/tools /root/.dotnet/tools
 COPY ["WebApi/docker-entrypoint.sh", "."]
+# .env file will be mounted by docker-compose with env_file directive
 # Install PostgreSQL client and other necessary tools
 RUN apt-get update && \
     apt-get install -y postgresql-client curl jq && \

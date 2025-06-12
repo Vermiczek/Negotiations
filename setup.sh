@@ -13,6 +13,19 @@ echo -e "${BOLD}==============================================${NC}"
 echo -e "${BOLD}Negotiations API Docker Setup${NC}"
 echo -e "${BOLD}==============================================${NC}"
 
+# Check if .env file exists, create from example if it doesn't
+if [ ! -f "./WebApi/.env" ]; then
+    if [ -f "./WebApi/.env.example" ]; then
+        echo -e "${YELLOW}Creating .env file from .env.example...${NC}"
+        cp ./WebApi/.env.example ./WebApi/.env
+        echo -e "${YELLOW}Please review the .env file and update any necessary values.${NC}"
+    else
+        echo -e "${RED}ERROR: .env.example file not found.${NC}"
+        echo "Please create a .env file in the WebApi directory manually."
+        exit 1
+    fi
+fi
+
 if ! command -v docker &> /dev/null; then
     echo -e "${RED}ERROR: Docker is not installed.${NC}"
     echo "Please install Docker and try again."
